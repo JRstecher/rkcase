@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+:root {
+  --background: #050816;
+  --foreground: #ECF2FF;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #050816;
+    --foreground: #ECF2FF;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Focus visible clavier (WCAG 2.4.7) — ne remplace pas les styles focus explicites des composants */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid rgb(165, 180, 252);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+html,
+body {
+  background-color: #000;
+  color-scheme: dark;
+}
+
+::selection {
+  background: rgba(99, 102, 241, 0.30);
+}
+
+/* Subtle grid + glow background */
+.rk-bg {
+  background:
+    radial-gradient(900px 600px at 18% 8%, rgba(99, 102, 241, 0.32), transparent 62%),
+    radial-gradient(900px 600px at 88% 18%, rgba(168, 85, 247, 0.22), transparent 58%),
+    radial-gradient(700px 500px at 60% 92%, rgba(56, 189, 248, 0.12), transparent 55%),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03), transparent 35%),
+    repeating-linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0.05) 0px,
+      rgba(255, 255, 255, 0.05) 1px,
+      transparent 1px,
+      transparent 72px
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.04) 0px,
+      rgba(255, 255, 255, 0.04) 1px,
+      transparent 1px,
+      transparent 72px
+    );
+}
+
+.rk-card {
+  background: linear-gradient(
+    180deg,
+    rgba(17, 24, 39, 0.55),
+    rgba(0, 0, 0, 0.35)
+  );
+  border: 1px solid rgba(129, 140, 248, 0.18);
+  box-shadow:
+    0 0 0 1px rgba(99, 102, 241, 0.12) inset,
+    0 12px 40px rgba(0, 0, 0, 0.45);
+}

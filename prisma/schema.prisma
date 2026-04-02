@@ -1,0 +1,160 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Rarity {
+  COMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
+model User {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  displayName String @default("Demo Player")
+  balance     Int    @default(10000) // coins (démo)
+
+  openings    Opening[]
+  inventory   InventoryItem[]
+  caseBattles CaseBattle[]
+}
+
+model Case {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  slug  String @unique
+  name  String
+  price Int
+
+  drops         CaseDrop[]
+  openings      Opening[]
+  caseBattles   CaseBattle[]
+}
+
+model Item {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name   String
+  rarity Rarity
+  value  Int
+  /** Aperçu Steam (CDN community) — optionnel */
+  imageUrl String?
+
+  drops         CaseDrop[]
+  wonIn         Opening?          @relation(fields: [wonInId], references: [id])
+  wonInId       String?           @unique
+  inventory     InventoryItem[]
+  battleRolls   CaseBattleRoll[]
+}
+
+model CaseDrop {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  caseId String
+  itemId String
+
+  weight Int
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, itemId])
+  @@index([caseId])
+}
+
+model Opening {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId String
+  caseId String
+
+  // For auditability in demo mode.
+  clientSeed String
+  serverSeed String
+  nonce      Int
+
+  pricePaid Int
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  wonItem Item?
+
+  @@index([userId, createdAt])
+  @@index([caseId, createdAt])
+}
+
+model InventoryItem {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId String
+  itemId String
+
+  equipped Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([itemId])
+}
+
+/** Battle de caisses : plusieurs ouvertures de la même caisse, le plus gros drop gagne. */
+model CaseBattle {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  caseId String
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  slots      Int
+  serverSeed String
+  clientSeed String
+  totalPaid  Int
+  winnerSlot Int
+
+  rolls CaseBattleRoll[]
+
+  @@index([userId, createdAt])
+  @@index([caseId, createdAt])
+}
+
+model CaseBattleRoll {
+  id String @id @default(cuid())
+
+  battleId String
+  battle CaseBattle @relation(fields: [battleId], references: [id], onDelete: Cascade)
+
+  slotIndex Int
+  label     String
+
+  itemId String
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  nonce Int
+
+  @@index([battleId])
+}
