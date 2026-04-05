@@ -1,195 +1,289 @@
-import type { Rarity } from "@/generated/prisma/enums";
-import { STEAM_PREVIEW_URL_BY_SKIN_NAME } from "@/lib/steamSkinImages";
+import { HELL_CASE_DROPS } from "@/data/hellCaseDrops";
+import { STARTING_BALANCE_CENTS } from "@/lib/money";
 import { prisma } from "@/server/db";
 
-const TARGET_CASE_COUNT = 100;
+const HELL_CASE_SLUG = "hell";
+const HELL_CASE_NAME = "Sakura Blossom Case 🌸";
+const NIHON_CASE_SLUG = "nihon";
+const NIHON_CASE_NAME = "Caisse Nihon 日本 · Lame silencieuse";
+const DRAGON_CASE_SLUG = "dragon";
+const DRAGON_CASE_NAME = "Caisse Dragon d'azur 🐉 · AWP & vague";
+const HELL_CASE_PRICE_CENTS = 20;
+const HELL_ITEM_COUNT = HELL_CASE_DROPS.length;
+const HELL_FIRST_NAME = HELL_CASE_DROPS[0]!.name;
 
-const CSGO_SKIN_ROWS = [
-  { name: "P250 | Sand Dune", rarity: "COMMON" as const, value: 400 },
-  { name: "Nova | Predator", rarity: "COMMON" as const, value: 650 },
-  { name: "AK-47 | Redline", rarity: "RARE" as const, value: 5400 },
-  { name: "Glock-18 | Water Elemental", rarity: "RARE" as const, value: 6200 },
-  { name: "M4A1-S | Hyper Beast", rarity: "EPIC" as const, value: 12000 },
-  { name: "AWP | Asiimov", rarity: "EPIC" as const, value: 16500 },
-  { name: "AWP | Dragon Lore", rarity: "LEGENDARY" as const, value: 65000 },
-  { name: "Karambit | Fade", rarity: "LEGENDARY" as const, value: 92000 },
-] as const;
+function pragmaColumnNames(rows: unknown): string[] {
+  if (!Array.isArray(rows)) return [];
+  const out: string[] = [];
+  for (const row of rows) {
+    if (row && typeof row === "object") {
+      const o = row as Record<string, unknown>;
+      const v = o.name ?? o.NAME;
+      if (typeof v === "string") out.push(v);
+    }
+  }
+  return out;
+}
 
-/** Skins façon CS + vignettes CDN Steam (démo). */
-const CSGO_SKINS = CSGO_SKIN_ROWS.map((s) => ({
-  ...s,
-  imageUrl: STEAM_PREVIEW_URL_BY_SKIN_NAME[s.name] ?? null,
-}));
+/**
+ * Si la base a été créée avant les manches battle, les colonnes manquent et Prisma plante.
+ * SQLite uniquement (schéma actuel).
+ */
+async function ensurePlayerLevelColumns() {
+  try {
+    const cols = await prisma.$queryRawUnsafe('PRAGMA table_info("User")');
+    const names = pragmaColumnNames(cols);
+    if (!names.includes("xp")) {
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE "User" ADD COLUMN "xp" INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+    if (!names.includes("freeCaseOpens")) {
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE "User" ADD COLUMN "freeCaseOpens" INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+    if (!names.includes("enterLevelRewardedUpTo")) {
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE "User" ADD COLUMN "enterLevelRewardedUpTo" INTEGER NOT NULL DEFAULT 1',
+      );
+    }
+  } catch (err) {
+    console.error("[seed] ensurePlayerLevelColumns:", err);
+  }
+}
 
-/** Met à jour les noms / valeurs des items même si le catalogue des caisses est déjà à 100. */
-async function syncCsgoItems() {
-  const items = await prisma.item.findMany({ orderBy: { createdAt: "asc" } });
-  if (items.length !== CSGO_SKINS.length) return;
-  for (let i = 0; i < CSGO_SKINS.length; i++) {
-    const t = CSGO_SKINS[i]!;
-    const row = items[i]!;
+/** Table support (SQLite) si migration pas encore appliquée. */
+async function ensureSupportMessagesTable() {
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "SupportMessage" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "email" TEXT,
+        "subject" TEXT NOT NULL,
+        "body" TEXT NOT NULL
+      )
+    `);
+    await prisma.$executeRawUnsafe(
+      `CREATE INDEX IF NOT EXISTS "SupportMessage_createdAt_idx" ON "SupportMessage"("createdAt")`,
+    );
+  } catch (err) {
+    console.error("[seed] ensureSupportMessagesTable:", err);
+  }
+}
+
+async function ensureBattleRoundColumns() {
+  try {
+    const battleCols = await prisma.$queryRawUnsafe(
+      'PRAGMA table_info("CaseBattle")',
+    );
+    if (!pragmaColumnNames(battleCols).includes("rounds")) {
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE "CaseBattle" ADD COLUMN "rounds" INTEGER NOT NULL DEFAULT 1',
+      );
+    }
+    const rollCols = await prisma.$queryRawUnsafe(
+      'PRAGMA table_info("CaseBattleRoll")',
+    );
+    if (!pragmaColumnNames(rollCols).includes("roundIndex")) {
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE "CaseBattleRoll" ADD COLUMN "roundIndex" INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+  } catch (err) {
+    console.error("[seed] ensureBattleRoundColumns:", err);
+  }
+}
+
+async function wipeCaseGraph() {
+  await prisma.$transaction([
+    prisma.caseBattleRoll.deleteMany(),
+    prisma.caseBattle.deleteMany(),
+    prisma.caseDrop.deleteMany(),
+    prisma.opening.deleteMany(),
+    prisma.inventoryItem.deleteMany(),
+    prisma.case.deleteMany(),
+    prisma.item.deleteMany(),
+  ]);
+}
+
+async function seedHellItems() {
+  await prisma.item.createMany({
+    data: HELL_CASE_DROPS.map((d) => ({
+      name: d.name,
+      rarity: d.rarity,
+      value: d.value,
+      imageUrl: d.imageUrl,
+    })),
+  });
+  const items = await prisma.item.findMany({
+    select: { id: true, name: true },
+  });
+  return new Map(items.map((i) => [i.name, { id: i.id }]));
+}
+
+async function hellCatalogNeedsFullReset(): Promise<boolean> {
+  const n = await prisma.item.count();
+  if (n !== HELL_ITEM_COUNT) return true;
+  const probe = await prisma.item.findFirst({
+    where: { name: HELL_FIRST_NAME },
+    select: { id: true },
+  });
+  return !probe;
+}
+
+async function syncHellItemFields() {
+  for (const d of HELL_CASE_DROPS) {
+    const row = await prisma.item.findFirst({
+      where: { name: d.name },
+      select: { id: true, value: true, rarity: true, imageUrl: true },
+    });
     if (
-      row.name !== t.name ||
-      row.value !== t.value ||
-      row.rarity !== t.rarity ||
-      row.imageUrl !== t.imageUrl
+      row &&
+      (row.value !== d.value ||
+        row.rarity !== d.rarity ||
+        row.imageUrl !== d.imageUrl)
     ) {
       await prisma.item.update({
         where: { id: row.id },
         data: {
-          name: t.name,
-          rarity: t.rarity,
-          value: t.value,
-          imageUrl: t.imageUrl,
+          value: d.value,
+          rarity: d.rarity,
+          imageUrl: d.imageUrl,
         },
       });
     }
   }
 }
 
-/** Prix case en centimes (0,20 € = 20 ; 1000 € = 100_000). */
-function buildCasePrices(): { cents: number; tier: "budget" | "premium" }[] {
-  const cheap: { cents: number; tier: "budget" }[] = [];
-  for (let i = 0; i < 85; i++) {
-    const cents = Math.round(20 + (i * (9999 - 20)) / 84);
-    cheap.push({ cents, tier: "budget" });
+async function ensureHellCase(itemsByName: Map<string, { id: string }>) {
+  const hell = await prisma.case.upsert({
+    where: { slug: HELL_CASE_SLUG },
+    create: {
+      slug: HELL_CASE_SLUG,
+      name: HELL_CASE_NAME,
+      price: HELL_CASE_PRICE_CENTS,
+    },
+    update: {
+      name: HELL_CASE_NAME,
+      price: HELL_CASE_PRICE_CENTS,
+    },
+  });
+
+  const dropCount = await prisma.caseDrop.count({
+    where: { caseId: hell.id },
+  });
+  if (dropCount !== HELL_ITEM_COUNT) {
+    await prisma.caseDrop.deleteMany({ where: { caseId: hell.id } });
+    await prisma.caseDrop.createMany({
+      data: HELL_CASE_DROPS.map((d) => {
+        const it = itemsByName.get(d.name);
+        if (!it) throw new Error(`Item manquant: ${d.name}`);
+        return {
+          caseId: hell.id,
+          itemId: it.id,
+          weight: d.weight,
+        };
+      }),
+    });
   }
-  const premium: { cents: number; tier: "premium" }[] = [];
-  for (let i = 0; i < 15; i++) {
-    const cents = Math.round(10000 + (i * (100000 - 10000)) / 14);
-    premium.push({ cents, tier: "premium" });
-  }
-  return [...cheap, ...premium];
 }
 
-const NAME_BASES = [
-  "Brume",
-  "Cuivre",
-  "Sable",
-  "Neon",
-  "Cyber",
-  "Pixel",
-  "Nano",
-  "Flash",
-  "Glace",
-  "Feu",
-  "Ombre",
-  "Aube",
-  "Vague",
-  "Flux",
-  "Echo",
-  "Nova",
-  "Urban",
-  "Lucky",
-  "Loot",
-  "Prime",
-] as const;
+async function ensureDragonCase(itemsByName: Map<string, { id: string }>) {
+  const dragon = await prisma.case.upsert({
+    where: { slug: DRAGON_CASE_SLUG },
+    create: {
+      slug: DRAGON_CASE_SLUG,
+      name: DRAGON_CASE_NAME,
+      price: HELL_CASE_PRICE_CENTS,
+    },
+    update: {
+      name: DRAGON_CASE_NAME,
+      price: HELL_CASE_PRICE_CENTS,
+    },
+  });
 
-function caseNameAt(index: number, tier: "budget" | "premium") {
-  const base = NAME_BASES[index % NAME_BASES.length]!;
-  const wave = Math.floor(index / NAME_BASES.length) + 1;
-  const core = wave > 1 ? `Caisse ${base} ${wave}` : `Caisse ${base}`;
-  return tier === "premium" ? `${core} ★` : core;
+  const dropCount = await prisma.caseDrop.count({
+    where: { caseId: dragon.id },
+  });
+  if (dropCount !== HELL_ITEM_COUNT) {
+    await prisma.caseDrop.deleteMany({ where: { caseId: dragon.id } });
+    await prisma.caseDrop.createMany({
+      data: HELL_CASE_DROPS.map((d) => {
+        const it = itemsByName.get(d.name);
+        if (!it) throw new Error(`Item manquant: ${d.name}`);
+        return {
+          caseId: dragon.id,
+          itemId: it.id,
+          weight: d.weight,
+        };
+      }),
+    });
+  }
 }
 
-function weightForDrop(
-  priceCents: number,
-  item: { id: string; rarity: Rarity },
-): number {
-  const t = Math.min(1, priceCents / 100_000);
-  let w = 10;
-  switch (item.rarity) {
-    case "COMMON":
-      w = Math.round(48 * (1 - t) + 12);
-      break;
-    case "RARE":
-      w = Math.round(32 * (1 - t * 0.65) + 14);
-      break;
-    case "EPIC":
-      w = Math.round(22 * t + 8);
-      break;
-    case "LEGENDARY":
-      w = Math.round(14 * t * t + 2);
-      break;
-    default:
-      w = 10;
+async function ensureNihonCase(itemsByName: Map<string, { id: string }>) {
+  const nihon = await prisma.case.upsert({
+    where: { slug: NIHON_CASE_SLUG },
+    create: {
+      slug: NIHON_CASE_SLUG,
+      name: NIHON_CASE_NAME,
+      price: HELL_CASE_PRICE_CENTS,
+    },
+    update: {
+      name: NIHON_CASE_NAME,
+      price: HELL_CASE_PRICE_CENTS,
+    },
+  });
+
+  const dropCount = await prisma.caseDrop.count({
+    where: { caseId: nihon.id },
+  });
+  if (dropCount !== HELL_ITEM_COUNT) {
+    await prisma.caseDrop.deleteMany({ where: { caseId: nihon.id } });
+    await prisma.caseDrop.createMany({
+      data: HELL_CASE_DROPS.map((d) => {
+        const it = itemsByName.get(d.name);
+        if (!it) throw new Error(`Item manquant: ${d.name}`);
+        return {
+          caseId: nihon.id,
+          itemId: it.id,
+          weight: d.weight,
+        };
+      }),
+    });
   }
-  return Math.max(1, w);
 }
 
 export async function ensureDemoSeed() {
-  await syncCsgoItems();
-
-  const n = await prisma.case.count();
-  if (n === TARGET_CASE_COUNT) {
-    const u = await prisma.user.findFirst({ orderBy: { createdAt: "asc" } });
-    if (u && u.balance < 50_000) {
-      await prisma.user.update({
-        where: { id: u.id },
-        data: { balance: 500_000 },
-      });
-    }
-    return;
+  await ensureBattleRoundColumns();
+  await ensurePlayerLevelColumns();
+  await ensureSupportMessagesTable();
+  if (await hellCatalogNeedsFullReset()) {
+    await wipeCaseGraph();
+    const itemsByName = await seedHellItems();
+    await ensureHellCase(itemsByName);
+    await ensureNihonCase(itemsByName);
+    await ensureDragonCase(itemsByName);
+  } else {
+    await syncHellItemFields();
+    const items = await prisma.item.findMany({
+      select: { id: true, name: true },
+    });
+    const itemsByName = new Map(items.map((i) => [i.name, { id: i.id }]));
+    await ensureHellCase(itemsByName);
+    await ensureNihonCase(itemsByName);
+    await ensureDragonCase(itemsByName);
   }
 
-  await prisma.$transaction([
-    prisma.caseDrop.deleteMany(),
-    prisma.opening.deleteMany(),
-    prisma.case.deleteMany(),
-  ]);
-
-  let user = await prisma.user.findFirst({ orderBy: { createdAt: "asc" } });
+  const user = await prisma.user.findFirst({ orderBy: { createdAt: "asc" } });
   if (!user) {
-    user = await prisma.user.create({
-      data: { displayName: "Demo Player", balance: 500_000 },
-    });
-  } else {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { balance: 500_000 },
-    });
-  }
-
-  let items = await prisma.item.findMany({ orderBy: { createdAt: "asc" } });
-  if (items.length === 0) {
-    items = await prisma.item.createManyAndReturn({
-      data: CSGO_SKINS.map((s) => ({ ...s })),
-    });
-  } else {
-    await syncCsgoItems();
-    items = await prisma.item.findMany({ orderBy: { createdAt: "asc" } });
-  }
-
-  const priced = buildCasePrices().sort((a, b) => a.cents - b.cents);
-
-  for (let i = 0; i < priced.length; i++) {
-    const { cents, tier } = priced[i]!;
-    const slug = `rk-${String(i + 1).padStart(3, "0")}`;
-    const name = caseNameAt(i, tier);
-    const c = await prisma.case.create({
+    await prisma.user.create({
       data: {
-        slug,
-        name,
-        price: cents,
+        displayName: "Demo Player",
+        balance: STARTING_BALANCE_CENTS,
       },
-    });
-
-    const drops = items.map((it) => ({
-      caseId: c.id,
-      itemId: it.id,
-      weight: weightForDrop(cents, it),
-    }));
-
-    await prisma.caseDrop.createMany({ data: drops });
-  }
-
-  const invCount = await prisma.inventoryItem.count({
-    where: { userId: user.id },
-  });
-  if (invCount === 0) {
-    const commons = items.filter((i) => i.rarity === "COMMON").slice(0, 2);
-    await prisma.inventoryItem.createMany({
-      data: commons.map((i) => ({ userId: user.id, itemId: i.id })),
     });
   }
 }

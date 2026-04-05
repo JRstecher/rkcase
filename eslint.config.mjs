@@ -5,6 +5,16 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  {
+    files: [
+      "src/components/BattleRouletteRows.tsx",
+      "src/components/CaseHorizontalRoulette.tsx",
+    ],
+    rules: {
+      // Animations roulette : mesure DOM puis état transform dans useLayoutEffect (avant paint).
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

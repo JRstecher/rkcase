@@ -1,25 +1,27 @@
 {
-  "name": "rkcase",
+  "name": "casebs",
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "prisma generate",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "prisma:generate": "prisma generate",
-    "postinstall": "prisma generate",
-    "docker:build": "docker build -t rkcase .",
-    "docker:up": "docker compose up -d --build"
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.6.0",
     "@prisma/client": "^7.6.0",
     "better-sqlite3": "^12.8.0",
+    "dotenv": "^16.4.7",
     "next": "16.2.2",
+    "next-auth": "5.0.0-beta.30",
     "prisma": "^7.6.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "stripe": "^17.7.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

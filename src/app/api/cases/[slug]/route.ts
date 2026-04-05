@@ -18,19 +18,12 @@ export async function GET(
 
   let total = 0;
   for (const d of c.drops) total += d.weight;
-  type DropRow = {
-    item: (typeof c.drops)[number]["item"];
-    weight: number;
-    chance: number;
-  };
-  const drops: DropRow[] = [];
-  for (const d of c.drops) {
-    drops.push({
-      item: d.item,
-      weight: d.weight,
-      chance: total > 0 ? d.weight / total : 0,
-    });
-  }
+
+  const drops = c.drops.map((d) => ({
+    item: d.item,
+    weight: d.weight,
+    chance: total > 0 ? d.weight / total : 0,
+  }));
   drops.sort((a, b) => b.chance - a.chance);
 
   return NextResponse.json({
@@ -38,4 +31,3 @@ export async function GET(
     drops,
   });
 }
-

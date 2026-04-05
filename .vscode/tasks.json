@@ -1,0 +1,42 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "casebs: dev",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "Path": "C:\\Program Files\\nodejs;${env:Path}"
+        }
+      },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "casebs: build",
+      "type": "shell",
+      "command": "npm run build",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "Path": "C:\\Program Files\\nodejs;${env:Path}"
+        }
+      },
+      "problemMatcher": ["$eslint-stylish"]
+    },
+    {
+      "label": "casebs: install",
+      "type": "shell",
+      "command": "npm install",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "Path": "C:\\Program Files\\nodejs;${env:Path}"
+        }
+      },
+      "problemMatcher": []
+    }
+  ]
+}

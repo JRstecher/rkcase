@@ -1,0 +1,22 @@
+{
+  "terminal.integrated.env.windows": {
+    "Path": "C:\\Program Files\\nodejs;${env:Path}"
+  },
+  "terminal.integrated.profiles.windows": {
+    "Casebs (Node + PowerShell)": {
+      "source": "PowerShell",
+      "icon": "terminal-powershell",
+      "env": {
+        "Path": "C:\\Program Files\\nodejs;${env:Path}"
+      }
+    },
+    "Casebs (Node + CMD)": {
+      "path": "C:\\Windows\\System32\\cmd.exe",
+      "icon": "terminal-cmd",
+      "env": {
+        "Path": "C:\\Program Files\\nodejs;${env:Path}"
+      }
+    }
+  },
+  "terminal.integrated.defaultProfile.windows": "Casebs (Node + PowerShell)"
+}

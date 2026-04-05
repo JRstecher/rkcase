@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "CaseBattle" ADD COLUMN "rounds" INTEGER NOT NULL DEFAULT 1;
+
+-- AlterTable
+ALTER TABLE "CaseBattleRoll" ADD COLUMN "roundIndex" INTEGER NOT NULL DEFAULT 0;

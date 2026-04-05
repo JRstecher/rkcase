@@ -1,14 +1,7 @@
-import type { Metadata } from "next";
 import { NavBar } from "@/components/NavBar";
 import { prisma } from "@/server/db";
 import { ensureDemoSeed } from "@/server/seed";
 import { BattleClient } from "./BattleClient";
-
-export const metadata: Metadata = {
-  title: "Battle de caisses — RKCase",
-  description:
-    "Ouvre la même caisse sur plusieurs slots : le meilleur drop gagne la manche (démo).",
-};
 
 export const dynamic = "force-dynamic";
 
@@ -22,11 +15,19 @@ export default async function BattlePage() {
   return (
     <div className="min-h-dvh">
       <NavBar />
-      <main
-        id="contenu-principal"
-        tabIndex={-1}
-        className="mx-auto w-full max-w-6xl px-4 py-10 outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-      >
+      <main>
+        <div className="mx-auto max-w-6xl px-4 pt-10">
+          <h1 className="text-2xl font-semibold text-white sm:text-3xl">
+            Battle de caisses
+          </h1>
+          <p className="mt-2 text-sm text-zinc-400">
+            Jusqu&apos;à 4 participants (toi inclus). Crée une battle, puis ajoute
+            les bots un par un jusqu&apos;à la limite choisie. Tous ouvrent la même
+            caisse ; tu peux enchaîner plusieurs manches. Gagnant = meilleure somme
+            sur les manches ; égalité = départage provably fair. Si tu gagnes, tout
+            le butin va dans ton inventaire.
+          </p>
+        </div>
         <BattleClient cases={cases} />
       </main>
     </div>

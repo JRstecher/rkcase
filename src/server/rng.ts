@@ -1,25 +1,60 @@
 import { createHash } from "crypto";
 
-function sha256Hex(input: string) {
-  return createHash("sha256").update(input).digest("hex");
+function hexToBytes(hex: string): Uint8Array {
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
 }
 
-// Deterministic pseudo-random number in [0, 1) from seeds.
-export function seededUnitFloat(params: {
+/**
+ * u ∈ [0, 1) dérivé d’un hash SHA-256 sur la chaîne
+ * `clientSeed:nonce:serverSeed` — utilisé pour le tirage pondéré côté serveur
+ * avant toute animation cliente.
+ */
+export function seededUnitFloat(input: {
   serverSeed: string;
   clientSeed: string;
   nonce: number;
-}) {
-  const h = sha256Hex(
-    `${params.serverSeed}:${params.clientSeed}:${params.nonce}`,
-  );
-  // Take 52 bits (like JS float mantissa) from hex.
-  const slice = h.slice(0, 13); // 13 hex chars = 52 bits
-  const n = parseInt(slice, 16);
-  return n / 2 ** 52;
+}): number {
+  const payload = `${input.clientSeed}:${input.nonce}:${input.serverSeed}`;
+  const digest = createHash("sha256").update(payload).digest("hex");
+  const bytes = hexToBytes(digest.slice(0, 16));
+  let x = BigInt(0);
+  for (let i = 0; i < bytes.length; i++) {
+    x = (x << BigInt(8)) | BigInt(bytes[i]!);
+  }
+  const max = BigInt(256) ** BigInt(bytes.length);
+  const denom = Number(max);
+  return Number(x % BigInt(denom)) / denom;
 }
 
-export function pickWeightedIndex(weights: number[], u: number) {
+/**
+ * u ∈ [0, 1) indépendant du tirage principal, pour un usage purement visuel
+ * (ex. position du trait sur la carte) — payload distinct via `purpose`.
+ */
+export function seededUnitFloatForPurpose(
+  input: {
+    serverSeed: string;
+    clientSeed: string;
+    nonce: number;
+  },
+  purpose: string,
+): number {
+  const payload = `${input.clientSeed}:${input.nonce}:${input.serverSeed}:${purpose}`;
+  const digest = createHash("sha256").update(payload).digest("hex");
+  const bytes = hexToBytes(digest.slice(0, 16));
+  let x = BigInt(0);
+  for (let i = 0; i < bytes.length; i++) {
+    x = (x << BigInt(8)) | BigInt(bytes[i]!);
+  }
+  const max = BigInt(256) ** BigInt(bytes.length);
+  const denom = Number(max);
+  return Number(x % BigInt(denom)) / denom;
+}
+
+export function pickWeightedIndex(weights: number[], u: number): number {
   const total = weights.reduce((s, w) => s + w, 0);
   if (total <= 0) throw new Error("Invalid weights");
   const t = u * total;
@@ -30,4 +65,3 @@ export function pickWeightedIndex(weights: number[], u: number) {
   }
   return weights.length - 1;
 }
-

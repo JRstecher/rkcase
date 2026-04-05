@@ -1,0 +1,16 @@
+Casebs - demarrer le site (sans PowerShell si ca plante)
+=====================================================
+
+1) Double-clic sur :  dev.cmd
+   OU  serveur-dans-cmd.cmd  (ouvre une nouvelle fenetre)
+
+2) Dans PowerShell, si les scripts posent probleme :
+   .\depuis-powershell.cmd
+
+3) Sans aucun fichier du projet (Invite de commandes cmd.exe) :
+   cd /d C:\chemin\vers\votre-projet-casebs
+   "C:\Program Files\nodejs\npm.cmd" run dev
+
+Puis navigateur : http://localhost:3000
+
+Si Windows supprime des fichiers : exclusions antivirus sur ce dossier du projet Casebs.

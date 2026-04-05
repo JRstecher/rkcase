@@ -16,9 +16,10 @@ type Props =
       height: number;
     };
 
-/** Aperçu skin : CDN Steam (optimisé) ou SVG data-URL (`unoptimized`). */
 export function SkinPreviewImage(props: Props) {
-  const unoptimized = props.src.startsWith("data:");
+  /** CDN externes : évite échecs d’optimisation / domaines non listés en dev. */
+  const unoptimized =
+    props.src.startsWith("data:") || /^https?:\/\//i.test(props.src);
 
   if ("fill" in props && props.fill) {
     return (
